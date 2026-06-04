@@ -205,12 +205,14 @@ export function PrinterProvider({ children }) {
           item = { ...item, w: result.w, h: result.h };
         }
         const aspect = (item.w || 1) / (item.h || 1);
-        // Tamaño por defecto: ~30% del ancho de la hoja, alto proporcional
+        // Tamaño por defecto: ~30% del ancho de la hoja, alto proporcional a la HOJA
         const wPct = 30;
-        // Calculamos hPct relativo al aspecto de la imagen y de la hoja
         const { widthMm, heightMm } = sheetDimsMm(paper.size, paper.orientation);
-        const hPct = (wPct * (widthMm / heightMm)) / aspect;
-        const finalH = Math.min(70, Math.max(8, hPct));
+        // hPct correcto: convierte un ancho-en-mm a alto-en-mm preservando aspect, y luego a % de la altura de la hoja
+        const wMm = (wPct / 100) * widthMm;
+        const hMm = wMm / aspect;
+        const hPctRaw = (hMm / heightMm) * 100;
+        const finalH = Math.min(80, Math.max(5, hPctRaw));
         // offset acumulado para múltiples drops
         const xPct = clamp(dropXPct - wPct / 2 + i * 2, 0, 100 - wPct);
         const yPct = clamp(dropYPct - finalH / 2 + i * 2, 0, 100 - finalH);
