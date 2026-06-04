@@ -71,11 +71,13 @@ const Canvas = forwardRef(function Canvas(_, ref) {
     const yPct = ((e.clientY - rect.top) / rect.height) * 100;
     const imageId = e.dataTransfer.getData("application/x-image-id");
     if (imageId) {
+      const wPct = 30;
+      const hPct = 30;
       placeImage(imageId, {
-        xPct: Math.max(0, Math.min(70, xPct - 15)),
-        yPct: Math.max(0, Math.min(70, yPct - 15)),
-        wPct: 30,
-        hPct: 30,
+        xPct: Math.max(0, Math.min(100 - wPct, xPct - wPct / 2)),
+        yPct: Math.max(0, Math.min(100 - hPct, yPct - hPct / 2)),
+        wPct,
+        hPct,
         pageIndex,
       });
       return;
