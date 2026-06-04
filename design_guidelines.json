@@ -1,0 +1,128 @@
+{
+  "theme": "LIGHT",
+  "archetype": "High-Fidelity Utility",
+  "emotional_tone": "Profesional, eficiente, calmado, enfocado. Un 'banco de trabajo' confiable que se siente premium y sin esfuerzo.",
+  "colors": {
+    "background": {
+      "app": "#F8FAFC",
+      "canvas_workspace": "#E2E8F0",
+      "paper": "#FFFFFF"
+    },
+    "surface": {
+      "panels": "#FFFFFF",
+      "floating_tools": "rgba(255, 255, 255, 0.85)"
+    },
+    "primary": {
+      "default": "#1E3A8A",
+      "hover": "#1E40AF",
+      "active": "#1D4ED8"
+    },
+    "accent": {
+      "green": "#10B981",
+      "green_hover": "#059669",
+      "purple": "#8B5CF6",
+      "purple_hover": "#7C3AED"
+    },
+    "text": {
+      "primary": "#0F172A",
+      "secondary": "#64748B",
+      "inverse": "#FFFFFF",
+      "disabled": "#94A3B8"
+    },
+    "border": {
+      "default": "#E2E8F0",
+      "active": "#94A3B8",
+      "guillotine_crop": "#8B5CF6"
+    }
+  },
+  "typography": {
+    "fonts": {
+      "heading": "Manrope, sans-serif",
+      "body": "Figtree, sans-serif",
+      "mono": "JetBrains Mono, monospace"
+    },
+    "hierarchy": {
+      "h1": "text-2xl font-bold tracking-tight text-slate-900",
+      "h2": "text-xl font-semibold tracking-tight text-slate-900",
+      "h3": "text-lg font-medium text-slate-900",
+      "label": "text-xs font-semibold uppercase tracking-widest text-slate-500",
+      "body": "text-sm text-slate-700 leading-relaxed",
+      "tool_text": "text-xs font-medium text-slate-600"
+    }
+  },
+  "spacing_and_layout": {
+    "philosophy": "Espacio de trabajo calmado. Maximizar el área del lienzo. Minimizar el desorden en los paneles. Usar espaciado interno generoso dentro de los paneles de propiedades.",
+    "structure": {
+      "app_container": "h-screen w-screen flex flex-col overflow-hidden bg-slate-50 text-slate-900",
+      "top_bar": "h-14 flex items-center justify-between px-4 border-b border-slate-200 bg-white/80 backdrop-blur-md z-50",
+      "main_workspace": "flex flex-1 overflow-hidden",
+      "left_sidebar": "w-72 bg-white border-r border-slate-200 flex flex-col z-40 shadow-[4px_0_24px_rgba(0,0,0,0.02)]",
+      "canvas_area": "flex-1 bg-slate-100/50 relative overflow-auto flex items-center justify-center p-8",
+      "right_sidebar": "w-80 bg-white border-l border-slate-200 flex flex-col z-40 overflow-y-auto shadow-[-4px_0_24px_rgba(0,0,0,0.02)]"
+    },
+    "canvas_paper": "bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-200 transition-all duration-300 relative",
+    "corner_radius": {
+      "panels": "rounded-none",
+      "cards": "rounded-xl",
+      "buttons": "rounded-lg",
+      "inputs": "rounded-md"
+    }
+  },
+  "components_strategy": {
+    "buttons": {
+      "primary": "bg-blue-900 text-white hover:bg-blue-800 transition-colors shadow-sm font-medium",
+      "secondary": "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 transition-colors shadow-sm font-medium",
+      "ghost": "bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors font-medium",
+      "guillotine_toggle": "data-[state=on]:bg-purple-100 data-[state=on]:text-purple-700 data-[state=off]:bg-slate-100 data-[state=off]:text-slate-600 border border-transparent data-[state=on]:border-purple-200"
+    },
+    "dropzone": "border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 hover:bg-slate-100 hover:border-blue-400 transition-all flex flex-col items-center justify-center p-6 text-center cursor-pointer",
+    "image_thumbnail": "relative rounded-lg overflow-hidden border border-slate-200 group hover:shadow-md hover:border-blue-300 transition-all bg-slate-50 aspect-square",
+    "crop_marks": "absolute inset-0 border-2 border-dashed border-purple-500 pointer-events-none z-10 opacity-80",
+    "libraries_to_use": [
+      "lucide-react (Iconos limpios y profesionales)",
+      "shadcn/ui (Para Tabs, Dialogs, Select, Slider, Switch, Tooltip)",
+      "react-rnd o dnd-kit (Para drag, drop y resize dentro del lienzo)"
+    ]
+  },
+  "motion_and_interactions": {
+    "hover_states": "Cambios sutiles de fondo (ej. slate-50 a slate-100). Los íconos deben tener un ligero cambio de color para retroalimentación visual.",
+    "transitions": "Usar `transition-all duration-200 ease-in-out` universalmente para cambios de color y sombras.",
+    "canvas_interactions": "Arrastre suave (smooth dragging). Al hacer snap a la cuadrícula, mostrar una línea azul sutil. Nunca deformar la imagen (aspect ratio fijo).",
+    "loading": "Usar skeleton loaders (pulsos) para las miniaturas de imágenes antes de renderizarse completamente."
+  },
+  "accessibility": {
+    "contrast": "Asegurar que los colores de texto cumplan al menos con 4.5:1. Slate-500 contra Slate-50 es el mínimo absoluto.",
+    "focus": "Usar focus visible: focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 focus:ring-offset-white",
+    "aria": "Usar aria-labels para todos los botones que sean exclusivamente de íconos en la barra superior."
+  },
+  "media": {
+    "image_urls": {
+      "sample_image_1": "https://images.unsplash.com/photo-1514960919797-5ff58c52e5ba?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzOTB8MHwxfHNlYXJjaHwxfHxzYW1wbGUlMjBwaG90b2dyYXBoeSUyMHBvcnRyYWl0fGVufDB8fHx8MTc4MDU5NzgyMHww&ixlib=rb-4.1.0&q=85",
+      "sample_image_2": "https://images.unsplash.com/photo-1639676514578-0eefd6e7083e?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzOTB8MHwxfHNlYXJjaHw0fHxzYW1wbGUlMjBwaG90b2dyYXBoeSUyMHBvcnRyYWl0fGVufDB8fHx8MTc4MDU5NzgyMHww&ixlib=rb-4.1.0&q=85",
+      "sample_logo": "https://images.unsplash.com/photo-1669220339242-c12788586902?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzZ8MHwxfHNlYXJjaHwyfHxzYW1wbGUlMjBtb2Rlcm4lMjBidXNpbmVzcyUyMGxvZ298ZW58MHx8fHwxNzgwNTk3ODIwfDA&ixlib=rb-4.1.0&q=85"
+    },
+    "description": "Utilizar estas imágenes de muestra para poblar el estado inicial de la lista de imágenes cargadas en el panel izquierdo durante el desarrollo. Esto permite probar el arrastre al lienzo de inmediato."
+  },
+  "instructions_to_main_agent": [
+    "Crea una aplicación React.js + Vite pura SPA (Sin Next.js routing ni SSR). Usa .js en lugar de .tsx.",
+    "Utiliza la API nativa del DOM para Clipboard (pegar imágenes con Ctrl+V) y Drag & Drop (HTML5 o librería como react-rnd/dnd-kit).",
+    "Tamaños de Lienzo (Layouts): Carta (8.5 x 11 pulgadas) y Oficio (8.5 x 14 pulgadas). Traduce estas medidas a píxeles de manera proporcional para la pantalla (ej. usando un factor de escala).",
+    "Modo Guillotina (Marcas de corte): Cuando el switch superior está activo, añade un borde punteado (dashed) morado (border-purple-500) alrededor de las imágenes en el lienzo para guiar el corte.",
+    "REGLA CRÍTICA DE IMÁGENES: NUNCA deformar el aspecto de la imagen. Usa bloqueo de aspect ratio en el resize y `object-fit: contain` o `cover` según el caso.",
+    "Layouts Rápidos: En el panel derecho incluye botones para auto-acomodo (2x2, 3x3, 4x4). Al clickear, debe posicionar las imágenes seleccionadas en una grilla perfecta dentro de la hoja.",
+    "Exportación: Usa una librería robusta como `html2canvas` junto con `jsPDF` para exportar el div del lienzo visual a PNG o PDF.",
+    "Idioma: TODO el texto de la interfaz debe estar obligatoriamente en Español."
+  ],
+  "data_testid_conventions": {
+    "format": "kebab-case, role-based",
+    "examples": [
+      "upload-dropzone",
+      "image-thumbnail-item",
+      "canvas-workspace",
+      "layout-preset-2x2",
+      "guillotine-mode-toggle",
+      "export-pdf-button",
+      "clear-canvas-button"
+    ]
+  }
+}
