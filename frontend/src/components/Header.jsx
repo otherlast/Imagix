@@ -48,26 +48,38 @@ export default function Header({ sheetRef }) {
   const doExport = async (type) => {
     if (exporting.current) return;
     if (!sheetRef?.current) return;
+    const nodes = sheetRef.current.getSheetNodes?.() || [];
+    if (nodes.length === 0) {
+      toast.error("No hay hojas para exportar");
+      return;
+    }
     exporting.current = true;
     const restoreGuillotine = guillotine;
     try {
-      // Aplicar la preferencia de exportación con marcas o sin marcas
       if (exportGuillotine !== guillotine) setGuillotine(exportGuillotine);
-      // Esperar al render
       await new Promise((r) => setTimeout(r, 80));
       const ts = new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-");
       if (type === "pdf") {
-        await exportToPDF(sheetRef.current, paper, `papeleria-${ts}.pdf`);
-        toast.success("PDF exportado");
+        await exportToPDF(nodes, paper, `papeleria-${ts}.pdf`);
+        toast.success(
+          nodes.length > 1
+            ? `PDF de ${nodes.length} hojas exportado`
+            : "PDF exportado",
+        );
       } else {
-        await exportToImage(sheetRef.current, paper, type, `papeleria-${ts}`);
-        toast.success(`${type.toUpperCase()} exportado`);
+        await exportToImage(nodes, paper, type, `papeleria-${ts}`);
+        toast.success(
+          nodes.length > 1
+            ? `${nodes.length} ${type.toUpperCase()} exportados`
+            : `${type.toUpperCase()} exportado`,
+        );
       }
     } catch (e) {
       console.error(e);
       toast.error("Error al exportar");
     } finally {
-      if (exportGuillotine !== restoreGuillotine) setGuillotine(restoreGuillotine);
+      if (exportGuillotine !== restoreGuillotine)
+        setGuillotine(restoreGuillotine);
       exporting.current = false;
     }
   };

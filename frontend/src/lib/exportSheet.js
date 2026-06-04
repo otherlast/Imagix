@@ -7,51 +7,89 @@ async function rasterize(node, paper) {
   const targetW = Math.round(widthMm * EXPORT_PX_PER_MM);
   const rect = node.getBoundingClientRect();
   const scale = targetW / rect.width;
-  // Mark exporting state to hide UI overlays
-  document.body.setAttribute("data-exporting", "true");
+  const canvas = await html2canvas(node, {
+    backgroundColor: "#ffffff",
+    scale,
+    useCORS: true,
+    allowTaint: true,
+    logging: false,
+    windowWidth: document.documentElement.scrollWidth,
+    windowHeight: document.documentElement.scrollHeight,
+  });
+  return { canvas, widthMm, heightMm };
+}
+
+function setExporting(on) {
+  if (on) document.body.setAttribute("data-exporting", "true");
+  else document.body.removeAttribute("data-exporting");
+}
+
+// Exporta múltiples hojas (nodes) a un PDF multi-página
+export async function exportToPDF(nodes, paper, filename = "papeleria.pdf") {
+  const list = Array.isArray(nodes) ? nodes : [nodes];
+  if (list.length === 0) return;
+  setExporting(true);
   try {
-    const canvas = await html2canvas(node, {
-      backgroundColor: "#ffffff",
-      scale,
-      useCORS: true,
-      allowTaint: true,
-      logging: false,
-      windowWidth: document.documentElement.scrollWidth,
-      windowHeight: document.documentElement.scrollHeight,
+    const orientation =
+      paper.orientation === "landscape" ? "landscape" : "portrait";
+    const first = await rasterize(list[0], paper);
+    const pdf = new jsPDF({
+      orientation,
+      unit: "mm",
+      format: [first.widthMm, first.heightMm],
     });
-    return { canvas, widthMm, heightMm };
+    pdf.addImage(
+      first.canvas.toDataURL("image/jpeg", 0.95),
+      "JPEG",
+      0,
+      0,
+      first.widthMm,
+      first.heightMm,
+    );
+    for (let i = 1; i < list.length; i++) {
+      const { canvas, widthMm, heightMm } = await rasterize(list[i], paper);
+      pdf.addPage([widthMm, heightMm], orientation);
+      pdf.addImage(
+        canvas.toDataURL("image/jpeg", 0.95),
+        "JPEG",
+        0,
+        0,
+        widthMm,
+        heightMm,
+      );
+    }
+    pdf.save(filename);
   } finally {
-    document.body.removeAttribute("data-exporting");
+    setExporting(false);
   }
 }
 
-export async function exportToPDF(node, paper, filename = "papeleria.pdf") {
-  const { canvas, widthMm, heightMm } = await rasterize(node, paper);
-  const orientation =
-    paper.orientation === "landscape" ? "landscape" : "portrait";
-  const pdf = new jsPDF({
-    orientation,
-    unit: "mm",
-    format: [widthMm, heightMm],
-  });
-  const imgData = canvas.toDataURL("image/jpeg", 0.95);
-  pdf.addImage(imgData, "JPEG", 0, 0, widthMm, heightMm);
-  pdf.save(filename);
-}
-
+// Exporta cada hoja a un archivo de imagen separado
 export async function exportToImage(
-  node,
+  nodes,
   paper,
   format = "png",
-  filename = "papeleria",
+  baseName = "papeleria",
 ) {
-  const { canvas } = await rasterize(node, paper);
-  const mime = format === "jpg" ? "image/jpeg" : "image/png";
-  const dataUrl = canvas.toDataURL(mime, 0.95);
-  const link = document.createElement("a");
-  link.href = dataUrl;
-  link.download = `${filename}.${format}`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  const list = Array.isArray(nodes) ? nodes : [nodes];
+  if (list.length === 0) return;
+  setExporting(true);
+  try {
+    const mime = format === "jpg" ? "image/jpeg" : "image/png";
+    for (let i = 0; i < list.length; i++) {
+      const { canvas } = await rasterize(list[i], paper);
+      const dataUrl = canvas.toDataURL(mime, 0.95);
+      const link = document.createElement("a");
+      link.href = dataUrl;
+      const suffix = list.length > 1 ? `-${String(i + 1).padStart(2, "0")}` : "";
+      link.download = `${baseName}${suffix}.${format}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      // Pequeña pausa para que el navegador no agrupe descargas
+      await new Promise((r) => setTimeout(r, 200));
+    }
+  } finally {
+    setExporting(false);
+  }
 }

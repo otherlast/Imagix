@@ -13,6 +13,7 @@ import {
   Eraser,
   CreditCard,
   Wand2,
+  Maximize2,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Slider } from "./ui/slider";
@@ -185,6 +186,12 @@ export default function RightSidebar() {
 
             <div className="grid grid-cols-3 gap-2">
               <LayoutBtn
+                icon={Maximize2}
+                label="Una x hoja"
+                testid="layout-full"
+                onClick={() => applyLayout("full")}
+              />
+              <LayoutBtn
                 icon={Sparkles}
                 label="Auto-fit"
                 testid="layout-auto"
@@ -218,16 +225,15 @@ export default function RightSidebar() {
                 variant="outline"
                 onClick={clearCanvas}
                 data-testid="clear-canvas-button"
-                className="h-auto flex-col py-3 gap-1.5 bg-white hover:bg-red-50 hover:border-red-200 hover:text-red-700"
+                className="h-auto flex-col py-3 gap-1.5 bg-white hover:bg-red-50 hover:border-red-200 hover:text-red-700 col-span-3"
               >
                 <Eraser className="h-5 w-5" />
-                <span className="text-[11px] font-medium">Vaciar hoja</span>
+                <span className="text-[11px] font-medium">Vaciar hojas</span>
               </Button>
             </div>
             <p className="text-[11px] text-slate-500 mt-3 leading-relaxed">
-              Los layouts respetan siempre la proporción original de cada
-              imagen. Si necesitas que llenen el cuadro, usa <b>Recortar</b>{" "}
-              abajo.
+              Los layouts distribuyen <b>todas</b> tus imágenes en tantas hojas
+              como hagan falta. Aspect ratio siempre respetado.
             </p>
           </section>
 
