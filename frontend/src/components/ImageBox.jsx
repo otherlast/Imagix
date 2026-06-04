@@ -147,11 +147,6 @@ export default function ImageBox({ placement, image, sheetEl }) {
     );
   };
 
-  // Selección con click
-  useEffect(() => {
-    // nothing
-  }, []);
-
   return (
     <div
       ref={boxRef}
