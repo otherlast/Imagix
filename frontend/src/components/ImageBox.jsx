@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef } from "react";
 import { Lock } from "lucide-react";
 import { clamp } from "../lib/sheet";
 import { usePrinter } from "../store/PrinterContext";

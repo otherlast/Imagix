@@ -39,7 +39,6 @@ export default function Header({ sheetRef }) {
     paper,
     exportGuillotine,
     setExportGuillotine,
-    setGuillotine: _setG,
   } = usePrinter();
   const exporting = useRef(false);
 
