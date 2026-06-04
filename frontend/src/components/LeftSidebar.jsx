@@ -100,9 +100,9 @@ export default function LeftSidebar() {
       </div>
 
       <ScrollArea className="flex-1 scrollbar-clean">
-        <div className="px-4 pb-4 space-y-2">
+        <div className="px-4 pb-4 grid grid-cols-2 gap-2">
           {images.length === 0 && (
-            <div className="text-center py-10 text-slate-400">
+            <div className="col-span-2 text-center py-10 text-slate-400">
               <ImageIcon className="h-8 w-8 mx-auto mb-2 opacity-50" />
               <p className="text-xs">Sin imágenes cargadas</p>
             </div>
@@ -120,10 +120,14 @@ export default function LeftSidebar() {
               onDoubleClick={() => placeImage(img.id)}
               title={`${img.name} · ${img.w}×${img.h}px — doble-click para colocar`}
             >
-              <div className="checker-bg w-full" style={{ height: "120px" }}>
+              <div
+                className="checker-bg w-full"
+                style={{ aspectRatio: "1 / 1" }}
+              >
                 <img
-                  src={img.src}
+                  src={img.thumb || img.src}
                   alt={img.name}
+                  loading="lazy"
                   className="w-full h-full"
                   style={{ objectFit: "contain", display: "block" }}
                   draggable={false}
@@ -138,17 +142,17 @@ export default function LeftSidebar() {
                   e.stopPropagation();
                   removeImage(img.id);
                 }}
-                className="absolute top-1.5 right-1.5 h-7 w-7 rounded-md bg-white/95 border border-slate-200 grid place-items-center text-slate-500 hover:text-red-600 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute top-1 right-1 h-6 w-6 rounded-md bg-white/95 border border-slate-200 grid place-items-center text-slate-500 hover:text-red-600 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
                 aria-label="Quitar imagen"
               >
-                <X className="h-4 w-4" />
+                <X className="h-3.5 w-3.5" />
               </button>
-              <div className="px-2 py-1.5 bg-white border-t border-slate-100">
-                <p className="text-[11px] font-medium text-slate-700 truncate">
+              <div className="px-1.5 py-1 bg-white border-t border-slate-100">
+                <p className="text-[10px] font-medium text-slate-700 truncate">
                   {img.name}
                 </p>
-                <p className="text-[10px] text-slate-400 font-mono">
-                  {img.w}×{img.h}px
+                <p className="text-[9px] text-slate-400 font-mono">
+                  {img.w}×{img.h}
                 </p>
               </div>
             </div>

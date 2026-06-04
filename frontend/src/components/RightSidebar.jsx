@@ -248,7 +248,7 @@ export default function RightSidebar() {
                 <div className="flex gap-2 items-center">
                   {selectedImage && (
                     <img
-                      src={selectedImage.src}
+                      src={selectedImage.thumb || selectedImage.src}
                       alt={selectedImage.name}
                       className="h-10 w-10 rounded object-cover border border-slate-200"
                     />

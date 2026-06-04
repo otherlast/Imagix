@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useMemo, useState } from "react
 import { uid, DEFAULT_MARGIN_MM, clamp, sheetDimsMm } from "../lib/sheet";
 import { buildLayout } from "../lib/layouts";
 import { processIneImage } from "../lib/ineProcessor";
+import { makeThumbnail, compressForCanvas } from "../lib/imageUtils";
 
 const PrinterContext = createContext(null);
 
@@ -23,13 +24,20 @@ export function PrinterProvider({ children }) {
   const addImageFromSrc = useCallback(async (src, name = "imagen") => {
     return new Promise((resolve) => {
       const img = new Image();
-      img.onload = () => {
+      img.onload = async () => {
+        // Comprimir imágenes muy grandes (>2000px de lado) para no saturar memoria/render
+        const compressed = await compressForCanvas(src, 2000, 0.92);
+        const finalSrc = compressed.src;
+        const w = compressed.w || img.naturalWidth;
+        const h = compressed.h || img.naturalHeight;
+        const thumb = await makeThumbnail(finalSrc, 240);
         const item = {
           id: uid("img"),
-          src,
+          src: finalSrc,
+          thumb,
           name,
-          w: img.naturalWidth,
-          h: img.naturalHeight,
+          w,
+          h,
         };
         setImages((prev) => [...prev, item]);
         resolve(item);
@@ -71,11 +79,12 @@ export function PrinterProvider({ children }) {
   const replaceImageSrc = useCallback((imageId, src) => {
     return new Promise((resolve) => {
       const im = new Image();
-      im.onload = () => {
+      im.onload = async () => {
+        const thumb = await makeThumbnail(src, 240);
         setImages((prev) =>
           prev.map((it) =>
             it.id === imageId
-              ? { ...it, src, w: im.naturalWidth, h: im.naturalHeight }
+              ? { ...it, src, thumb, w: im.naturalWidth, h: im.naturalHeight }
               : it,
           ),
         );
