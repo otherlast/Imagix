@@ -11,6 +11,8 @@ import {
   ZoomIn,
   Crop,
   Eraser,
+  CreditCard,
+  Wand2,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Slider } from "./ui/slider";
@@ -52,6 +54,9 @@ export default function RightSidebar() {
     updatePlacement,
     removePlacement,
     resetPlacement,
+    ineMode,
+    applyIneLayout,
+    processImageAsIne,
   } = usePrinter();
 
   const selected = placements.find((p) => p.id === selectedId);
@@ -149,6 +154,35 @@ export default function RightSidebar() {
             <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-2">
               Acomodo automático
             </p>
+
+            {ineMode && (
+              <div
+                data-testid="ine-mode-panel"
+                className="rounded-lg border border-blue-200 bg-blue-50/60 p-3 mb-3"
+              >
+                <div className="flex items-center gap-2 mb-1.5">
+                  <CreditCard className="h-3.5 w-3.5 text-blue-700" />
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-blue-800">
+                    Credenciales INE
+                  </p>
+                </div>
+                <p className="text-[11px] text-slate-600 leading-relaxed mb-2">
+                  Arrastra una foto del frente y otra del reverso, o usa una
+                  sola y la duplicamos. Las recortaremos al tamaño real (85.6 ×
+                  54 mm) y aplicaremos filtro escáner automáticamente.
+                </p>
+                <Button
+                  size="sm"
+                  onClick={applyIneLayout}
+                  data-testid="layout-ine"
+                  className="w-full bg-blue-900 hover:bg-blue-800 text-white"
+                >
+                  <CreditCard className="h-3.5 w-3.5 mr-1.5" /> Acomodar como
+                  INE (frente + reverso)
+                </Button>
+              </div>
+            )}
+
             <div className="grid grid-cols-3 gap-2">
               <LayoutBtn
                 icon={Sparkles}
@@ -228,6 +262,35 @@ export default function RightSidebar() {
                     </p>
                   </div>
                 </div>
+
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={async () => {
+                    if (!selectedImage) return;
+                    const { toast } = await import("sonner");
+                    const id = toast.loading("Procesando INE...");
+                    try {
+                      const result = await processImageAsIne(
+                        selectedImage.id,
+                      );
+                      toast.success(
+                        result?.detected
+                          ? "INE detectada y recortada automáticamente"
+                          : "Filtro aplicado y recortada por proporción INE",
+                        { id },
+                      );
+                    } catch (e) {
+                      console.error(e);
+                      toast.error("No se pudo procesar como INE", { id });
+                    }
+                  }}
+                  data-testid="process-as-ine-button"
+                  className="w-full border-blue-200 text-blue-800 hover:bg-blue-50"
+                >
+                  <Wand2 className="h-3.5 w-3.5 mr-1.5" /> Procesar como INE
+                  (recorte + escáner)
+                </Button>
 
                 <div>
                   <label className="text-[11px] text-slate-500">

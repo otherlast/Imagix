@@ -66,7 +66,7 @@ function ShortcutsAndPasteBinder() {
         setSelectedId(null);
       }
       if (e.key.toLowerCase() === "g" && !e.ctrlKey && !e.metaKey) {
-        setGuillotine(!guillotine);
+        setGuillotine((prev) => !prev);
       }
     };
 

@@ -65,6 +65,22 @@ export function buildLayout({ preset, images, paper, marginMm }) {
   } else if (preset === "auto") {
     const { rows, cols } = computeAutoFit(images.length);
     cells = gridCells(rows, cols, marginPct, gapPct);
+  } else if (preset === "ine") {
+    // 2 credenciales INE en tamaño real 85.6×54 mm, centradas vertical,
+    // una arriba (frente) y otra abajo (reverso).
+    const ineWmm = 85.6;
+    const ineHmm = 54;
+    const wPct = (ineWmm / widthMm) * 100;
+    const hPct = (ineHmm / heightMm) * 100;
+    const xPct = (100 - wPct) / 2;
+    // Distribución vertical: la hoja se divide en 3 espacios (margen, espacio, margen)
+    // Frente arriba (~30% Y), reverso abajo (~70% Y)
+    const topY = 33 - hPct / 2;
+    const botY = 67 - hPct / 2;
+    cells = [
+      { xPct, yPct: topY, wPct, hPct, _ine: true },
+      { xPct, yPct: botY, wPct, hPct, _ine: true },
+    ];
   }
 
   const placements = [];
@@ -79,11 +95,12 @@ export function buildLayout({ preset, images, paper, marginMm }) {
       yPct: cell.yPct,
       wPct: cell.wPct,
       hPct: cell.hPct,
-      fit: "contain", // contain = respeta proporción (sin recorte). cover = recorta.
-      offsetXPct: 0, // panning dentro del frame cuando fit=cover
+      fit: cell._ine ? "cover" : "contain",
+      offsetXPct: 0,
       offsetYPct: 0,
       zoom: 1,
       locked: false,
+      isIne: !!cell._ine,
     });
   }
   return placements;

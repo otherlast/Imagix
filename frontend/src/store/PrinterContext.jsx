@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
-import { uid, DEFAULT_MARGIN_MM, clamp } from "../lib/sheet";
+import { uid, DEFAULT_MARGIN_MM, clamp, sheetDimsMm } from "../lib/sheet";
 import { buildLayout } from "../lib/layouts";
+import { processIneImage } from "../lib/ineProcessor";
 
 const PrinterContext = createContext(null);
 
@@ -17,6 +18,7 @@ export function PrinterProvider({ children }) {
   const [selectedId, setSelectedId] = useState(null);
   const [internalClipboard, setInternalClipboard] = useState(null);
   const [exportGuillotine, setExportGuillotine] = useState(false);
+  const [ineMode, setIneMode] = useState(false);
 
   const addImageFromSrc = useCallback(async (src, name = "imagen") => {
     return new Promise((resolve) => {
@@ -53,6 +55,41 @@ export function PrinterProvider({ children }) {
       return added;
     },
     [addImageFromSrc],
+  );
+
+  // Reemplaza el src de una imagen (manteniendo id), p.ej. después de procesar INE
+  const replaceImageSrc = useCallback((imageId, src) => {
+    return new Promise((resolve) => {
+      const im = new Image();
+      im.onload = () => {
+        setImages((prev) =>
+          prev.map((it) =>
+            it.id === imageId
+              ? { ...it, src, w: im.naturalWidth, h: im.naturalHeight }
+              : it,
+          ),
+        );
+        resolve(true);
+      };
+      im.onerror = () => resolve(false);
+      im.src = src;
+    });
+  }, []);
+
+  // Procesa una imagen ya cargada como INE: detecta bordes + filtro escáner
+  const processImageAsIne = useCallback(
+    async (imageId, options = {}) => {
+      const img = images.find((it) => it.id === imageId);
+      if (!img) return null;
+      const result = await processIneImage(img.src, {
+        autoDetect: true,
+        applyFilter: true,
+        ...options,
+      });
+      await replaceImageSrc(imageId, result.src);
+      return result;
+    },
+    [images, replaceImageSrc],
   );
 
   const removeImage = useCallback((imageId) => {
@@ -140,6 +177,89 @@ export function PrinterProvider({ children }) {
     });
   }, [internalClipboard, placeImage]);
 
+  // Drop directo desde el SO al lienzo: carga la imagen Y crea su placement
+  // en la posición indicada (xPct/yPct relativos a la hoja).
+  const dropImagesAt = useCallback(
+    async (files, dropXPct, dropYPct, opts = {}) => {
+      const arr = Array.from(files || []).filter((f) =>
+        f.type?.startsWith("image/"),
+      );
+      if (arr.length === 0) return [];
+      const placed = [];
+      let i = 0;
+      for (const file of arr) {
+        const src = await new Promise((res) => {
+          const r = new FileReader();
+          r.onload = () => res(r.result);
+          r.readAsDataURL(file);
+        });
+        let item = await addImageFromSrc(src, file.name || "imagen");
+        if (!item) continue;
+        // Si modo INE está activo, procesar la imagen automáticamente
+        if (opts.ine || ineMode) {
+          const result = await processIneImage(item.src, {
+            autoDetect: true,
+            applyFilter: true,
+          });
+          await replaceImageSrc(item.id, result.src);
+          item = { ...item, w: result.w, h: result.h };
+        }
+        const aspect = (item.w || 1) / (item.h || 1);
+        // Tamaño por defecto: ~30% del ancho de la hoja, alto proporcional
+        const wPct = 30;
+        // Calculamos hPct relativo al aspecto de la imagen y de la hoja
+        const { widthMm, heightMm } = sheetDimsMm(paper.size, paper.orientation);
+        const hPct = (wPct * (widthMm / heightMm)) / aspect;
+        const finalH = Math.min(70, Math.max(8, hPct));
+        // offset acumulado para múltiples drops
+        const xPct = clamp(dropXPct - wPct / 2 + i * 2, 0, 100 - wPct);
+        const yPct = clamp(dropYPct - finalH / 2 + i * 2, 0, 100 - finalH);
+        const p = placeImage(item.id, {
+          xPct,
+          yPct,
+          wPct,
+          hPct: finalH,
+        });
+        placed.push(p);
+        i++;
+      }
+      return placed;
+    },
+    [
+      addImageFromSrc,
+      placeImage,
+      paper,
+      ineMode,
+      replaceImageSrc,
+    ],
+  );
+
+  // Aplica el layout INE: si hay 0 placements y hay imágenes, las acomoda;
+  // si hay 1 imagen, intenta duplicarla (frente/reverso) en posiciones INE.
+  const applyIneLayout = useCallback(() => {
+    if (images.length === 0) return;
+    const imgs = images.slice(0, 2);
+    if (imgs.length === 1) {
+      // Duplicar la única imagen como frente/reverso
+      const next = buildLayout({
+        preset: "ine",
+        images: [imgs[0], imgs[0]],
+        paper,
+        marginMm,
+      });
+      setPlacements(next);
+    } else {
+      const next = buildLayout({
+        preset: "ine",
+        images: imgs,
+        paper,
+        marginMm,
+      });
+      setPlacements(next);
+    }
+    setSelectedId(null);
+  }, [images, paper, marginMm]);
+
   const value = useMemo(
     () => ({
       // state
@@ -152,6 +272,7 @@ export function PrinterProvider({ children }) {
       selectedId,
       internalClipboard,
       exportGuillotine,
+      ineMode,
       // setters
       setPaper,
       setMarginMm,
@@ -159,6 +280,7 @@ export function PrinterProvider({ children }) {
       setSnapToGrid,
       setSelectedId,
       setExportGuillotine,
+      setIneMode,
       // actions
       addImagesFromFiles,
       addImageFromSrc,
@@ -172,6 +294,10 @@ export function PrinterProvider({ children }) {
       resetPlacement,
       copySelected,
       pasteInternal,
+      dropImagesAt,
+      processImageAsIne,
+      applyIneLayout,
+      replaceImageSrc,
     }),
     [
       images,
@@ -183,6 +309,7 @@ export function PrinterProvider({ children }) {
       selectedId,
       internalClipboard,
       exportGuillotine,
+      ineMode,
       addImagesFromFiles,
       addImageFromSrc,
       removeImage,
@@ -195,6 +322,10 @@ export function PrinterProvider({ children }) {
       resetPlacement,
       copySelected,
       pasteInternal,
+      dropImagesAt,
+      processImageAsIne,
+      applyIneLayout,
+      replaceImageSrc,
     ],
   );
 

@@ -13,6 +13,8 @@ const Canvas = forwardRef(function Canvas(_, ref) {
     setSelectedId,
     placeImage,
     selectedId,
+    dropImagesAt,
+    ineMode,
   } = usePrinter();
   const containerRef = useRef(null);
   const fallbackSheetRef = useRef(null);
@@ -48,21 +50,30 @@ const Canvas = forwardRef(function Canvas(_, ref) {
     return () => ro.disconnect();
   }, [dims.widthMm, dims.heightMm]);
 
-  // Handle drop de miniatura a hoja
+  // Handle drop: thumbnail interna O archivos del SO
   const onDrop = async (e) => {
     e.preventDefault();
     setDragOver(false);
-    const imageId = e.dataTransfer.getData("application/x-image-id");
-    if (!imageId) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const xPct = ((e.clientX - rect.left) / rect.width) * 100;
     const yPct = ((e.clientY - rect.top) / rect.height) * 100;
-    placeImage(imageId, {
-      xPct: Math.max(0, Math.min(70, xPct - 15)),
-      yPct: Math.max(0, Math.min(70, yPct - 15)),
-      wPct: 30,
-      hPct: 30,
-    });
+
+    // 1) Si vino una imagen interna (de la sidebar)
+    const imageId = e.dataTransfer.getData("application/x-image-id");
+    if (imageId) {
+      placeImage(imageId, {
+        xPct: Math.max(0, Math.min(70, xPct - 15)),
+        yPct: Math.max(0, Math.min(70, yPct - 15)),
+        wPct: 30,
+        hPct: 30,
+      });
+      return;
+    }
+    // 2) Si vienen archivos del SO
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      await dropImagesAt(files, xPct, yPct);
+    }
   };
 
   const marginPctW = (marginMm / dims.widthMm) * 100;
@@ -76,12 +87,27 @@ const Canvas = forwardRef(function Canvas(_, ref) {
       onClick={() => setSelectedId(null)}
     >
       {/* Indicador de medidas */}
-      <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 bg-white/85 backdrop-blur-md border border-slate-200 rounded-full px-3 py-1 text-[11px] font-mono text-slate-600 shadow-sm export-hide">
-        {dims.widthMm.toFixed(0)} × {dims.heightMm.toFixed(0)} mm
-        <span className="mx-2 text-slate-300">|</span>
-        Hoja:{" "}
-        {paper.size === "letter" ? "Carta" : "Oficio"} ·{" "}
-        {paper.orientation === "portrait" ? "Vertical" : "Horizontal"}
+      <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 bg-white/85 backdrop-blur-md border border-slate-200 rounded-full px-3 py-1 text-[11px] font-mono text-slate-600 shadow-sm export-hide flex items-center gap-2">
+        <span>
+          {dims.widthMm.toFixed(0)} × {dims.heightMm.toFixed(0)} mm
+        </span>
+        <span className="text-slate-300">|</span>
+        <span>
+          Hoja: {paper.size === "letter" ? "Carta" : "Oficio"} ·{" "}
+          {paper.orientation === "portrait" ? "Vertical" : "Horizontal"}
+        </span>
+        {ineMode && (
+          <>
+            <span className="text-slate-300">|</span>
+            <span
+              data-testid="ine-mode-indicator"
+              className="inline-flex items-center gap-1 text-blue-700 font-semibold"
+            >
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-600 animate-pulse" />
+              Modo INE activo
+            </span>
+          </>
+        )}
       </div>
 
       <div
@@ -117,13 +143,15 @@ const Canvas = forwardRef(function Canvas(_, ref) {
 
         {placements.length === 0 && (
           <div className="absolute inset-0 grid place-items-center text-slate-400 export-hide pointer-events-none">
-            <div className="text-center">
+            <div className="text-center px-6">
               <ImageIcon className="h-10 w-10 mx-auto opacity-50 mb-2" />
               <p className="text-sm font-medium text-slate-500">
                 Hoja vacía
               </p>
               <p className="text-[12px] text-slate-400 mt-0.5">
-                Arrastra imágenes aquí o usa un layout automático
+                {ineMode
+                  ? "Arrastra una foto de INE aquí — la recortaremos y limpiaremos automáticamente"
+                  : "Arrastra imágenes desde tu computadora directamente aquí"}
               </p>
             </div>
           </div>

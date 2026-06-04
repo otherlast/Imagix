@@ -7,6 +7,7 @@ import {
   ImageDown,
   Printer,
   Layers,
+  CreditCard,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Switch } from "./ui/switch";
@@ -39,6 +40,8 @@ export default function Header({ sheetRef }) {
     paper,
     exportGuillotine,
     setExportGuillotine,
+    ineMode,
+    setIneMode,
   } = usePrinter();
   const exporting = useRef(false);
 
@@ -90,6 +93,31 @@ export default function Header({ sheetRef }) {
         </div>
 
         <div className="flex items-center gap-1.5">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div
+                className={`tool-button flex items-center gap-2 rounded-lg border px-3 h-9 cursor-pointer ${
+                  ineMode
+                    ? "bg-blue-50 border-blue-200 text-blue-800"
+                    : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                }`}
+                onClick={() => setIneMode(!ineMode)}
+                data-testid="ine-mode-toggle"
+              >
+                <CreditCard className="h-4 w-4" />
+                <span className="text-sm font-medium">Modo INE</span>
+                <Switch
+                  checked={ineMode}
+                  onCheckedChange={setIneMode}
+                  className="data-[state=checked]:bg-blue-700"
+                />
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>
+              Recorta INEs automáticamente y aplica filtro escáner
+            </TooltipContent>
+          </Tooltip>
+
           <Tooltip>
             <TooltipTrigger asChild>
               <div
