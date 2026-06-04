@@ -42,17 +42,27 @@ export function PrinterProvider({ children }) {
   const addImagesFromFiles = useCallback(
     async (files) => {
       const added = [];
+      const failed = [];
       for (const file of files) {
-        if (!file.type.startsWith("image/")) continue;
+        if (!file.type.startsWith("image/")) {
+          failed.push(file.name);
+          continue;
+        }
         const src = await new Promise((res) => {
           const r = new FileReader();
           r.onload = () => res(r.result);
+          r.onerror = () => res(null);
           r.readAsDataURL(file);
         });
+        if (!src) {
+          failed.push(file.name);
+          continue;
+        }
         const item = await addImageFromSrc(src, file.name || "imagen");
         if (item) added.push(item);
+        else failed.push(file.name);
       }
-      return added;
+      return { added, failed };
     },
     [addImageFromSrc],
   );

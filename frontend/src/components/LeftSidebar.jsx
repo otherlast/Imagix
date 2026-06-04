@@ -14,8 +14,12 @@ export default function LeftSidebar() {
     async (fileList) => {
       const files = Array.from(fileList || []);
       if (files.length === 0) return;
-      const added = await addImagesFromFiles(files);
+      const { added, failed } = await addImagesFromFiles(files);
       if (added.length) toast.success(`${added.length} imagen(es) cargada(s)`);
+      if (failed.length)
+        toast.error(
+          `${failed.length} archivo(s) no se pudieron cargar: ${failed.slice(0, 3).join(", ")}${failed.length > 3 ? "..." : ""}`,
+        );
     },
     [addImagesFromFiles],
   );
@@ -96,9 +100,9 @@ export default function LeftSidebar() {
       </div>
 
       <ScrollArea className="flex-1 scrollbar-clean">
-        <div className="px-4 pb-4 grid grid-cols-2 gap-2.5">
+        <div className="px-4 pb-4 space-y-2">
           {images.length === 0 && (
-            <div className="col-span-2 text-center py-10 text-slate-400">
+            <div className="text-center py-10 text-slate-400">
               <ImageIcon className="h-8 w-8 mx-auto mb-2 opacity-50" />
               <p className="text-xs">Sin imágenes cargadas</p>
             </div>
@@ -112,29 +116,40 @@ export default function LeftSidebar() {
                 e.dataTransfer.setData("application/x-image-id", img.id);
                 e.dataTransfer.effectAllowed = "copy";
               }}
-              className="group relative rounded-lg overflow-hidden border border-slate-200 hover:shadow-md hover:border-blue-300 transition-all bg-slate-50 aspect-square cursor-grab active:cursor-grabbing"
+              className="group relative rounded-lg overflow-hidden border border-slate-200 hover:shadow-md hover:border-blue-300 transition-all cursor-grab active:cursor-grabbing"
               onDoubleClick={() => placeImage(img.id)}
-              title={`${img.name} · ${img.w}×${img.h}`}
+              title={`${img.name} · ${img.w}×${img.h}px — doble-click para colocar`}
             >
-              <img
-                src={img.src}
-                alt={img.name}
-                className="w-full h-full object-contain bg-slate-100"
-                draggable={false}
-              />
+              <div className="checker-bg w-full" style={{ height: "120px" }}>
+                <img
+                  src={img.src}
+                  alt={img.name}
+                  className="w-full h-full"
+                  style={{ objectFit: "contain", display: "block" }}
+                  draggable={false}
+                  onError={(e) => {
+                    e.currentTarget.style.opacity = "0.2";
+                  }}
+                />
+              </div>
               <button
                 data-testid="remove-image-button"
                 onClick={(e) => {
                   e.stopPropagation();
                   removeImage(img.id);
                 }}
-                className="absolute top-1 right-1 h-6 w-6 rounded-md bg-white/90 border border-slate-200 grid place-items-center text-slate-500 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute top-1.5 right-1.5 h-7 w-7 rounded-md bg-white/95 border border-slate-200 grid place-items-center text-slate-500 hover:text-red-600 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
                 aria-label="Quitar imagen"
               >
-                <X className="h-3.5 w-3.5" />
+                <X className="h-4 w-4" />
               </button>
-              <div className="absolute bottom-0 inset-x-0 px-1.5 py-1 bg-gradient-to-t from-black/55 to-transparent">
-                <p className="text-[10px] text-white truncate">{img.name}</p>
+              <div className="px-2 py-1.5 bg-white border-t border-slate-100">
+                <p className="text-[11px] font-medium text-slate-700 truncate">
+                  {img.name}
+                </p>
+                <p className="text-[10px] text-slate-400 font-mono">
+                  {img.w}×{img.h}px
+                </p>
               </div>
             </div>
           ))}

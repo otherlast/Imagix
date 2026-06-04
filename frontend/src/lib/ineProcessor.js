@@ -13,25 +13,36 @@ export function loadOpenCV() {
   if (window.cv && window.cv.Mat) return Promise.resolve(window.cv);
   if (cvPromise) return cvPromise;
   cvPromise = new Promise((resolve) => {
+    const TIMEOUT_MS = 10000;
+    let resolved = false;
+    const finish = (val) => {
+      if (resolved) return;
+      resolved = true;
+      resolve(val);
+    };
+    const timeoutId = setTimeout(() => finish(null), TIMEOUT_MS);
     const script = document.createElement("script");
     script.src = "https://docs.opencv.org/4.10.0/opencv.js";
     script.async = true;
     script.onload = () => {
+      const start = Date.now();
       const wait = () => {
+        if (resolved) return;
         if (window.cv && window.cv.Mat) {
-          resolve(window.cv);
-        } else if (window.cv && typeof window.cv.then === "function") {
-          window.cv.then(resolve).catch(() => resolve(null));
-        } else if (window.cv) {
-          // ya cargando — espera un tick
-          setTimeout(wait, 50);
+          clearTimeout(timeoutId);
+          finish(window.cv);
+        } else if (Date.now() - start > TIMEOUT_MS) {
+          finish(null);
         } else {
-          setTimeout(wait, 50);
+          setTimeout(wait, 80);
         }
       };
       wait();
     };
-    script.onerror = () => resolve(null);
+    script.onerror = () => {
+      clearTimeout(timeoutId);
+      finish(null);
+    };
     document.head.appendChild(script);
   });
   return cvPromise;
