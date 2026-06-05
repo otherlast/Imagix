@@ -12,6 +12,7 @@ export default function ImageBox({ placement, image, sheetEl }) {
     selectedId,
     guillotine,
     snapToGrid,
+    commit,
   } = usePrinter();
   const isSelected = selectedId === placement.id;
   const boxRef = useRef(null);

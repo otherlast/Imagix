@@ -18,6 +18,8 @@ function ShortcutsAndPasteBinder() {
     setGuillotine,
     guillotine,
     duplicateSelected,
+    undo,
+    redo,
   } = usePrinter();
   const lastInternalCopy = useRef(0);
 
@@ -53,6 +55,17 @@ function ShortcutsAndPasteBinder() {
           tgt.tagName === "TEXTAREA" ||
           tgt.isContentEditable);
       if (isTyping) return;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
+        e.preventDefault();
+        redo();
+        return;
+      }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "c") {
         if (selectedId) {
           copySelected();
@@ -94,6 +107,8 @@ function ShortcutsAndPasteBinder() {
     guillotine,
     placements,
     duplicateSelected,
+    undo,
+    redo,
   ]);
 
   return null;

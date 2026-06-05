@@ -8,6 +8,8 @@ import {
   Printer,
   Layers,
   CreditCard,
+  Undo2,
+  Redo2,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Switch } from "./ui/switch";
@@ -42,6 +44,10 @@ export default function Header({ sheetRef }) {
     setExportGuillotine,
     ineMode,
     setIneMode,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
   } = usePrinter();
   const exporting = useRef(false);
 
@@ -105,6 +111,38 @@ export default function Header({ sheetRef }) {
         </div>
 
         <div className="flex items-center gap-1.5">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={undo}
+                disabled={!canUndo}
+                data-testid="undo-button"
+                className="h-9 w-9"
+              >
+                <Undo2 className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Deshacer (Ctrl+Z)</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={redo}
+                disabled={!canRedo}
+                data-testid="redo-button"
+                className="h-9 w-9"
+              >
+                <Redo2 className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Rehacer (Ctrl+Shift+Z / Ctrl+Y)</TooltipContent>
+          </Tooltip>
+          <div className="w-px h-6 bg-slate-200 mx-1" />
+
           <Tooltip>
             <TooltipTrigger asChild>
               <div

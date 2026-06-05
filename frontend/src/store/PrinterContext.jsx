@@ -1,10 +1,12 @@
-import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { uid, DEFAULT_MARGIN_MM, clamp, sheetDimsMm } from "../lib/sheet";
 import { buildLayout } from "../lib/layouts";
 import { processIneImage } from "../lib/ineProcessor";
 import { makeThumbnail, compressForCanvas } from "../lib/imageUtils";
 
 const PrinterContext = createContext(null);
+
+const HISTORY_LIMIT = 50;
 
 export function PrinterProvider({ children }) {
   const [images, setImages] = useState([]); // {id, src, name, w, h}
@@ -20,6 +22,66 @@ export function PrinterProvider({ children }) {
   const [internalClipboard, setInternalClipboard] = useState(null);
   const [exportGuillotine, setExportGuillotine] = useState(false);
   const [ineMode, setIneMode] = useState(false);
+
+  // History stack para undo/redo. Guarda snapshots de {images, placements}.
+  const [history, setHistory] = useState({ past: [], future: [] });
+  const imagesRef = useRef(images);
+  const placementsRef = useRef(placements);
+  useEffect(() => {
+    imagesRef.current = images;
+  }, [images]);
+  useEffect(() => {
+    placementsRef.current = placements;
+  }, [placements]);
+
+  // Toma un snapshot ANTES de un cambio destructivo
+  const commit = useCallback(() => {
+    setHistory((h) => ({
+      past: [
+        ...h.past.slice(-(HISTORY_LIMIT - 1)),
+        {
+          images: imagesRef.current,
+          placements: placementsRef.current,
+        },
+      ],
+      future: [],
+    }));
+  }, []);
+
+  const undo = useCallback(() => {
+    setHistory((h) => {
+      if (h.past.length === 0) return h;
+      const prev = h.past[h.past.length - 1];
+      const newPast = h.past.slice(0, -1);
+      const currentSnap = {
+        images: imagesRef.current,
+        placements: placementsRef.current,
+      };
+      setImages(prev.images);
+      setPlacements(prev.placements);
+      setSelectedId(null);
+      return { past: newPast, future: [...h.future, currentSnap] };
+    });
+  }, []);
+
+  const redo = useCallback(() => {
+    setHistory((h) => {
+      if (h.future.length === 0) return h;
+      const next = h.future[h.future.length - 1];
+      const newFuture = h.future.slice(0, -1);
+      const currentSnap = {
+        images: imagesRef.current,
+        placements: placementsRef.current,
+      };
+      setImages(next.images);
+      setPlacements(next.placements);
+      setSelectedId(null);
+      return { past: [...h.past, currentSnap], future: newFuture };
+    });
+  }, []);
+
+  const canUndo = history.past.length > 0;
+  const canRedo = history.future.length > 0;
 
   const addImageFromSrc = useCallback(async (src, name = "imagen") => {
     return new Promise((resolve) => {
@@ -111,31 +173,41 @@ export function PrinterProvider({ children }) {
     [images, replaceImageSrc],
   );
 
-  const removeImage = useCallback((imageId) => {
-    setImages((prev) => prev.filter((i) => i.id !== imageId));
-    setPlacements((prev) => prev.filter((p) => p.imageId !== imageId));
-  }, []);
+  const removeImage = useCallback(
+    (imageId) => {
+      commit();
+      setImages((prev) => prev.filter((i) => i.id !== imageId));
+      setPlacements((prev) => prev.filter((p) => p.imageId !== imageId));
+    },
+    [commit],
+  );
 
-  const placeImage = useCallback((imageId, partial = {}) => {
-    const p = {
-      id: uid("p"),
-      imageId,
-      xPct: 10,
-      yPct: 10,
-      wPct: 30,
-      hPct: 30,
-      fit: "contain",
-      offsetXPct: 0,
-      offsetYPct: 0,
-      zoom: 1,
-      locked: false,
-      pageIndex: 0,
-      ...partial,
-    };
-    setPlacements((prev) => [...prev, p]);
-    setSelectedId(p.id);
-    return p;
-  }, []);
+  const placeImage = useCallback(
+    (imageId, partial = {}) => {
+      commit();
+      // CRÍTICO: el id debe ser siempre fresh; descartamos cualquier id que venga en partial.
+      const { id: _ignoredId, ...rest } = partial;
+      const p = {
+        pageIndex: 0,
+        fit: "contain",
+        offsetXPct: 0,
+        offsetYPct: 0,
+        zoom: 1,
+        locked: false,
+        xPct: 10,
+        yPct: 10,
+        wPct: 30,
+        hPct: 30,
+        ...rest,
+        id: uid("p"),
+        imageId,
+      };
+      setPlacements((prev) => [...prev, p]);
+      setSelectedId(p.id);
+      return p;
+    },
+    [commit],
+  );
 
   const updatePlacement = useCallback((id, patch) => {
     setPlacements((prev) =>
@@ -143,42 +215,53 @@ export function PrinterProvider({ children }) {
     );
   }, []);
 
-  const removePlacement = useCallback((id) => {
-    setPlacements((prev) => prev.filter((p) => p.id !== id));
-    setSelectedId((cur) => (cur === id ? null : cur));
-  }, []);
+  const removePlacement = useCallback(
+    (id) => {
+      commit();
+      setPlacements((prev) => prev.filter((p) => p.id !== id));
+      setSelectedId((cur) => (cur === id ? null : cur));
+    },
+    [commit],
+  );
 
   const applyLayout = useCallback(
     (preset) => {
       if (images.length === 0) return;
+      commit();
       const next = buildLayout({ preset, images, paper, marginMm });
       setPlacements(next);
       setSelectedId(null);
     },
-    [images, paper, marginMm],
+    [images, paper, marginMm, commit],
   );
 
   const clearAll = useCallback(() => {
+    commit();
     setImages([]);
     setPlacements([]);
     setSelectedId(null);
     setInternalClipboard(null);
-  }, []);
+  }, [commit]);
 
   const clearCanvas = useCallback(() => {
+    commit();
     setPlacements([]);
     setSelectedId(null);
-  }, []);
+  }, [commit]);
 
-  const resetPlacement = useCallback((id) => {
-    setPlacements((prev) =>
-      prev.map((p) =>
-        p.id === id
-          ? { ...p, fit: "contain", offsetXPct: 0, offsetYPct: 0, zoom: 1 }
-          : p,
-      ),
-    );
-  }, []);
+  const resetPlacement = useCallback(
+    (id) => {
+      commit();
+      setPlacements((prev) =>
+        prev.map((p) =>
+          p.id === id
+            ? { ...p, fit: "contain", offsetXPct: 0, offsetYPct: 0, zoom: 1 }
+            : p,
+        ),
+      );
+    },
+    [commit],
+  );
 
   const copySelected = useCallback(() => {
     if (!selectedId) return;
@@ -191,13 +274,17 @@ export function PrinterProvider({ children }) {
     if (!selectedId) return null;
     const p = placements.find((x) => x.id === selectedId);
     if (!p) return null;
-    const nx = clamp(p.xPct + 4, 0, 100 - p.wPct);
-    const ny = clamp(p.yPct + 4, 0, 100 - p.hPct);
-    return placeImage(p.imageId, {
+    // Desplazar lo suficiente para que se vea claramente
+    const offX = Math.min(p.wPct * 0.5, 8);
+    const offY = Math.min(p.hPct * 0.5, 8);
+    const nx = clamp(p.xPct + offX, 0, 100 - p.wPct);
+    const ny = clamp(p.yPct + offY, 0, 100 - p.hPct);
+    const created = placeImage(p.imageId, {
       ...p,
       xPct: nx,
       yPct: ny,
     });
+    return created;
   }, [selectedId, placements, placeImage]);
 
   const pasteInternal = useCallback(() => {
@@ -272,6 +359,7 @@ export function PrinterProvider({ children }) {
   // Si solo hay 1 imagen, la duplica como frente y reverso.
   const applyIneLayout = useCallback(() => {
     if (images.length === 0) return;
+    commit();
     let imgs = images;
     if (imgs.length === 1) imgs = [imgs[0], imgs[0]];
     const next = buildLayout({
@@ -282,7 +370,7 @@ export function PrinterProvider({ children }) {
     });
     setPlacements(next);
     setSelectedId(null);
-  }, [images, paper, marginMm]);
+  }, [images, paper, marginMm, commit]);
 
   const value = useMemo(
     () => ({
@@ -297,6 +385,8 @@ export function PrinterProvider({ children }) {
       internalClipboard,
       exportGuillotine,
       ineMode,
+      canUndo,
+      canRedo,
       // setters
       setPaper,
       setMarginMm,
@@ -323,6 +413,9 @@ export function PrinterProvider({ children }) {
       processImageAsIne,
       applyIneLayout,
       replaceImageSrc,
+      undo,
+      redo,
+      commit,
     }),
     [
       images,
@@ -335,6 +428,8 @@ export function PrinterProvider({ children }) {
       internalClipboard,
       exportGuillotine,
       ineMode,
+      canUndo,
+      canRedo,
       addImagesFromFiles,
       addImageFromSrc,
       removeImage,
@@ -352,6 +447,9 @@ export function PrinterProvider({ children }) {
       processImageAsIne,
       applyIneLayout,
       replaceImageSrc,
+      undo,
+      redo,
+      commit,
     ],
   );
 
