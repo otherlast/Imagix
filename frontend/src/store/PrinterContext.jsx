@@ -226,13 +226,27 @@ export function PrinterProvider({ children }) {
 
   const applyLayout = useCallback(
     (preset) => {
-      if (images.length === 0) return;
+      // Si hay placements en el lienzo, los acomodamos respetando cantidad
+      // (incluyendo copias duplicadas de la misma imagen).
+      // Si no hay placements, usamos todas las imágenes cargadas.
+      const sourceImages =
+        placements.length > 0
+          ? placements
+              .map((p) => images.find((i) => i.id === p.imageId))
+              .filter(Boolean)
+          : images;
+      if (sourceImages.length === 0) return;
       commit();
-      const next = buildLayout({ preset, images, paper, marginMm });
+      const next = buildLayout({
+        preset,
+        images: sourceImages,
+        paper,
+        marginMm,
+      });
       setPlacements(next);
       setSelectedId(null);
     },
-    [images, paper, marginMm, commit],
+    [images, placements, paper, marginMm, commit],
   );
 
   const clearAll = useCallback(() => {
