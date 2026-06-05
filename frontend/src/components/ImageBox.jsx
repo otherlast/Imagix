@@ -29,8 +29,13 @@ export default function ImageBox({ placement, image, sheetEl }) {
     const startY = e.clientY;
     const startXPct = placement.xPct;
     const startYPct = placement.yPct;
+    let committed = false;
 
     const onMove = (ev) => {
+      if (!committed) {
+        committed = true;
+        commit();
+      }
       const dxPct = ((ev.clientX - startX) / rect.width) * 100;
       const dyPct = ((ev.clientY - startY) / rect.height) * 100;
       let nx = clamp(startXPct + dxPct, 0, 100 - placement.wPct);
@@ -61,8 +66,13 @@ export default function ImageBox({ placement, image, sheetEl }) {
     const startY = e.clientY;
     const s = { ...placement };
     const aspect = s.wPct / s.hPct;
+    let committed = false;
 
     const onMove = (ev) => {
+      if (!committed) {
+        committed = true;
+        commit();
+      }
       const dxPct = ((ev.clientX - startX) / rect.width) * 100;
       const dyPct = ((ev.clientY - startY) / rect.height) * 100;
       let x = s.xPct,
