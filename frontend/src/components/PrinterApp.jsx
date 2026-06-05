@@ -17,6 +17,7 @@ function ShortcutsAndPasteBinder() {
     placements,
     setGuillotine,
     guillotine,
+    duplicateSelected,
   } = usePrinter();
   const lastInternalCopy = useRef(0);
 
@@ -58,6 +59,12 @@ function ShortcutsAndPasteBinder() {
           lastInternalCopy.current = Date.now();
         }
       }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "d") {
+        if (selectedId) {
+          e.preventDefault();
+          duplicateSelected();
+        }
+      }
       if ((e.key === "Delete" || e.key === "Backspace") && selectedId) {
         e.preventDefault();
         removePlacement(selectedId);
@@ -86,6 +93,7 @@ function ShortcutsAndPasteBinder() {
     setGuillotine,
     guillotine,
     placements,
+    duplicateSelected,
   ]);
 
   return null;

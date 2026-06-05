@@ -186,6 +186,20 @@ export function PrinterProvider({ children }) {
     if (p) setInternalClipboard({ ...p });
   }, [selectedId, placements]);
 
+  // Duplicar la imagen seleccionada (copia + paste en un solo paso)
+  const duplicateSelected = useCallback(() => {
+    if (!selectedId) return null;
+    const p = placements.find((x) => x.id === selectedId);
+    if (!p) return null;
+    const nx = clamp(p.xPct + 4, 0, 100 - p.wPct);
+    const ny = clamp(p.yPct + 4, 0, 100 - p.hPct);
+    return placeImage(p.imageId, {
+      ...p,
+      xPct: nx,
+      yPct: ny,
+    });
+  }, [selectedId, placements, placeImage]);
+
   const pasteInternal = useCallback(() => {
     if (!internalClipboard) return null;
     const nx = clamp(internalClipboard.xPct + 4, 0, 95);
@@ -304,6 +318,7 @@ export function PrinterProvider({ children }) {
       resetPlacement,
       copySelected,
       pasteInternal,
+      duplicateSelected,
       dropImagesAt,
       processImageAsIne,
       applyIneLayout,
@@ -332,6 +347,7 @@ export function PrinterProvider({ children }) {
       resetPlacement,
       copySelected,
       pasteInternal,
+      duplicateSelected,
       dropImagesAt,
       processImageAsIne,
       applyIneLayout,

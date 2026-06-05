@@ -14,6 +14,7 @@ import {
   CreditCard,
   Wand2,
   Maximize2,
+  Copy,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Slider } from "./ui/slider";
@@ -58,6 +59,7 @@ export default function RightSidebar() {
     ineMode,
     applyIneLayout,
     processImageAsIne,
+    duplicateSelected,
   } = usePrinter();
 
   const selected = placements.find((p) => p.id === selectedId);
@@ -399,6 +401,26 @@ export default function RightSidebar() {
                   <Button
                     size="sm"
                     variant="outline"
+                    onClick={duplicateSelected}
+                    data-testid="duplicate-button"
+                    className="border-blue-200 text-blue-800 hover:bg-blue-50"
+                  >
+                    <Copy className="h-3.5 w-3.5 mr-1" /> Duplicar
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => resetPlacement(selected.id)}
+                    data-testid="reset-edit-button"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5 mr-1" /> Resetear
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
                     onClick={() =>
                       updatePlacement(selected.id, {
                         locked: !selected.locked,
@@ -419,22 +441,13 @@ export default function RightSidebar() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => resetPlacement(selected.id)}
-                    data-testid="reset-edit-button"
+                    onClick={() => removePlacement(selected.id)}
+                    data-testid="delete-placement-button"
+                    className="text-red-600 hover:bg-red-50 hover:text-red-700 border-red-100"
                   >
-                    <RotateCcw className="h-3.5 w-3.5 mr-1" /> Resetear
+                    <Trash2 className="h-3.5 w-3.5 mr-1" /> Quitar
                   </Button>
                 </div>
-
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => removePlacement(selected.id)}
-                  data-testid="delete-placement-button"
-                  className="w-full text-red-600 hover:bg-red-50 hover:text-red-700 border-red-100"
-                >
-                  <Trash2 className="h-3.5 w-3.5 mr-1" /> Quitar del lienzo
-                </Button>
               </div>
             )}
           </section>
