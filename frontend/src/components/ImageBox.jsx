@@ -19,6 +19,9 @@ export default function ImageBox({ placement, image, sheetEl }) {
 
   const getSheetRect = () => sheetEl?.getBoundingClientRect();
 
+  // Función de ajuste con paso más notorio (2.5% ~5mm en hoja carta)
+  const applySnap = (val, step = 2.5) => Math.round(val / step) * step;
+
   const startDrag = (e) => {
     e.stopPropagation();
     if (placement.locked) return;
@@ -40,13 +43,15 @@ export default function ImageBox({ placement, image, sheetEl }) {
       const dyPct = ((ev.clientY - startY) / rect.height) * 100;
       let nx = clamp(startXPct + dxPct, 0, 100 - placement.wPct);
       let ny = clamp(startYPct + dyPct, 0, 100 - placement.hPct);
+
       if (snapToGrid) {
-        const step = 1; // 1%
-        nx = Math.round(nx / step) * step;
-        ny = Math.round(ny / step) * step;
+        nx = applySnap(nx, 2.5);
+        ny = applySnap(ny, 2.5);
       }
+
       updatePlacement(placement.id, { xPct: nx, yPct: ny });
     };
+
     const onUp = () => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
@@ -79,6 +84,7 @@ export default function ImageBox({ placement, image, sheetEl }) {
         y = s.yPct,
         w = s.wPct,
         h = s.hPct;
+
       if (dir.includes("e")) w = s.wPct + dxPct;
       if (dir.includes("s")) h = s.hPct + dyPct;
       if (dir.includes("w")) {
@@ -89,7 +95,7 @@ export default function ImageBox({ placement, image, sheetEl }) {
         h = s.hPct - dyPct;
         y = s.yPct + dyPct;
       }
-      // Mantener proporción del CONTENEDOR si se mantiene Shift; por defecto libre
+
       if (ev.shiftKey) {
         if (Math.abs(dxPct) > Math.abs(dyPct)) {
           h = w / aspect;
@@ -99,10 +105,15 @@ export default function ImageBox({ placement, image, sheetEl }) {
           if (dir.includes("w")) x = s.xPct + (s.wPct - w);
         }
       }
-      // Limitar mínimos
+
+      if (snapToGrid) {
+        w = applySnap(w, 2.5);
+        h = applySnap(h, 2.5);
+      }
+
       w = Math.max(3, w);
       h = Math.max(3, h);
-      // Límites de hoja
+
       if (x < 0) {
         w += x;
         x = 0;
@@ -113,8 +124,10 @@ export default function ImageBox({ placement, image, sheetEl }) {
       }
       if (x + w > 100) w = 100 - x;
       if (y + h > 100) h = 100 - y;
+
       updatePlacement(placement.id, { xPct: x, yPct: y, wPct: w, hPct: h });
     };
+
     const onUp = () => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
@@ -123,35 +136,28 @@ export default function ImageBox({ placement, image, sheetEl }) {
     window.addEventListener("mouseup", onUp);
   };
 
-  // Calculamos cómo dibujar la imagen respetando aspect ratio.
-  // fit=contain: la imagen entera entra en la caja, márgenes vacíos centrados.
-  // fit=cover: la imagen llena la caja recortando lo que sobre. Offset y zoom permiten ajustar.
+  // 🎯 RENDERIZADO CON ROTACIÓN Y TRANSFORMACIONES DINÁMICAS
   const renderImage = () => {
     if (!image) return null;
-    if (placement.fit === "contain") {
-      return (
-        <img
-          src={image.src}
-          alt={image.name}
-          draggable={false}
-          className="w-full h-full"
-          style={{ objectFit: "contain", display: "block" }}
-        />
-      );
-    }
-    // cover
+
+    const rotation = placement.rotation || 0;
+    const zoom = placement.zoom || 1;
+    const offsetX = placement.offsetXPct || 0;
+    const offsetY = placement.offsetYPct || 0;
+    const fit = placement.fit || "contain";
+
     return (
-      <div className="w-full h-full overflow-hidden">
+      <div className="w-full h-full flex items-center justify-center overflow-hidden pointer-events-none">
         <img
           src={image.src}
-          alt={image.name}
+          alt={image.name || "Imagen"}
           draggable={false}
-          className="w-full h-full"
+          className="w-full h-full transition-transform duration-150 ease-out"
           style={{
-            objectFit: "cover",
-            display: "block",
-            transform: `translate(${placement.offsetXPct}%, ${placement.offsetYPct}%) scale(${placement.zoom})`,
+            objectFit: fit,
+            transform: `rotate(${rotation}deg) scale(${zoom}) translate(${offsetX}%, ${offsetY}%)`,
             transformOrigin: "center center",
+            display: "block",
           }}
         />
       </div>
@@ -178,7 +184,7 @@ export default function ImageBox({ placement, image, sheetEl }) {
         height: `${placement.hPct}%`,
       }}
     >
-      {/* Marcas de corte (guillotina) – borde punteado morado */}
+      {/* Marcas de corte (guillotina) */}
       {guillotine && (
         <div
           className="absolute pointer-events-none"
@@ -192,7 +198,7 @@ export default function ImageBox({ placement, image, sheetEl }) {
       )}
 
       <div
-        className={`relative w-full h-full bg-white ${
+        className={`relative w-full h-full bg-white overflow-hidden ${
           isSelected
             ? "outline outline-2 outline-blue-600 outline-offset-[-1px]"
             : "outline outline-1 outline-slate-200 outline-offset-[-1px] group-hover:outline-blue-300"
@@ -201,19 +207,19 @@ export default function ImageBox({ placement, image, sheetEl }) {
         {renderImage()}
 
         {placement.locked && (
-          <div className="absolute top-1 right-1 bg-white/95 rounded p-0.5 shadow-sm export-hide">
+          <div className="absolute top-1 right-1 bg-white/95 rounded p-0.5 shadow-sm export-hide z-30">
             <Lock className="h-3 w-3 text-slate-600" />
           </div>
         )}
 
-        {/* Handles de resize – ocultos en exportación */}
+        {/* Handles de resize */}
         {isSelected &&
           !placement.locked &&
           HANDLES.map((dir) => (
             <span
               key={dir}
               onMouseDown={(e) => startResize(e, dir)}
-              className={`absolute h-2.5 w-2.5 bg-white border-2 border-blue-600 rounded-sm z-20 export-hide ${
+              className={`absolute h-2.5 w-2.5 bg-white border-2 border-blue-600 rounded-sm z-30 export-hide ${
                 {
                   n: "left-1/2 -top-1.5 -translate-x-1/2 cursor-n-resize",
                   s: "left-1/2 -bottom-1.5 -translate-x-1/2 cursor-s-resize",

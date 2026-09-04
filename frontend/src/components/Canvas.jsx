@@ -1,8 +1,10 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { usePrinter } from "../store/PrinterContext";
+import { useKeyboardSwap } from "../hooks/useKeyboardSwap";
 import { sheetDimsMm } from "../lib/sheet";
 import { pageCountOf } from "../lib/layouts";
 import ImageBox from "./ImageBox";
+
 import { ImageIcon, Plus } from "lucide-react";
 
 const Canvas = forwardRef(function Canvas(_, ref) {
@@ -11,11 +13,23 @@ const Canvas = forwardRef(function Canvas(_, ref) {
     placements,
     images,
     marginMm,
+    selectedId,       // Extraído del contexto para resolver el ReferenceError
     setSelectedId,
+    updatePlacement,  // Extraído para pasar al hook de intercambio
+    commit,           // Extraído para pasar al hook de intercambio
     placeImage,
     dropImagesAt,
     ineMode,
   } = usePrinter();
+
+  // Integración del hook de teclado con los valores requeridos
+  useKeyboardSwap({
+    selectedId,
+    placements,
+    updatePlacement,
+    commit,
+  });
+
   const containerRef = useRef(null);
   const sheetRefs = useRef([]); // refs por página
   const [sheetSize, setSheetSize] = useState({ w: 600, h: 800 });

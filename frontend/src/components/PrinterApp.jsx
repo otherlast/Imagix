@@ -23,13 +23,25 @@ function ShortcutsAndPasteBinder() {
   } = usePrinter();
   const lastInternalCopy = useRef(0);
 
-  useEffect(() => {
+useEffect(() => {
     const onPaste = async (e) => {
-      // pegar imagen del sistema clipboard
+      const tgt = e.target;
+      const isTyping =
+        tgt &&
+        (tgt.tagName === "INPUT" ||
+          tgt.tagName === "TEXTAREA" ||
+          tgt.isContentEditable);
+      if (isTyping) return;
+
       const items = e.clipboardData?.items || [];
       let pastedImg = false;
+
       for (const item of items) {
         if (item.type && item.type.startsWith("image/")) {
+          // Prevenimos el comportamiento por defecto y detenemos la propagación
+          e.preventDefault();
+          e.stopPropagation();
+
           const file = item.getAsFile();
           if (file) {
             const reader = new FileReader();
@@ -39,10 +51,14 @@ function ShortcutsAndPasteBinder() {
             reader.readAsDataURL(file);
             pastedImg = true;
           }
+          break; // Detenemos el loop en la primera imagen para evitar procesar sub-items duplicados
         }
       }
+
+      // Solo si NO se detectó ninguna imagen física en el portapapeles del sistema,
+      // intentamos hacer el pegado interno de la app.
       if (!pastedImg) {
-        // si no había imagen del sistema, intenta paste interno
+        e.preventDefault();
         pasteInternal();
       }
     };
@@ -55,6 +71,7 @@ function ShortcutsAndPasteBinder() {
           tgt.tagName === "TEXTAREA" ||
           tgt.isContentEditable);
       if (isTyping) return;
+
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
         e.preventDefault();
         if (e.shiftKey) redo();
@@ -110,7 +127,6 @@ function ShortcutsAndPasteBinder() {
     undo,
     redo,
   ]);
-
   return null;
 }
 

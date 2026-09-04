@@ -1,5 +1,5 @@
-import { useCallback, useRef, useState } from "react";
-import { Upload, Image as ImageIcon, X, Plus, Clipboard } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Upload, Image as ImageIcon, X, Plus, Clipboard, LayoutGrid } from "lucide-react";
 import { Button } from "./ui/button";
 import { ScrollArea } from "./ui/scroll-area";
 import { usePrinter } from "../store/PrinterContext";
@@ -10,30 +10,81 @@ export default function LeftSidebar() {
   const inputRef = useRef(null);
   const [dragOver, setDragOver] = useState(false);
 
-  const onFilesPicked = useCallback(
+  // Procesamiento unificado de archivos (Subida, Drag&Drop, Paste)
+  const processFiles = useCallback(
     async (fileList) => {
-      const files = Array.from(fileList || []);
+      const files = Array.from(fileList || []).filter((file) =>
+        file.type.startsWith("image/")
+      );
       if (files.length === 0) return;
+
       const { added, failed } = await addImagesFromFiles(files);
-      if (added.length) toast.success(`${added.length} imagen(es) cargada(s)`);
-      if (failed.length)
+      if (added?.length) toast.success(`${added.length} imagen(es) cargada(s)`);
+      if (failed?.length) {
         toast.error(
-          `${failed.length} archivo(s) no se pudieron cargar: ${failed.slice(0, 3).join(", ")}${failed.length > 3 ? "..." : ""}`,
+          `${failed.length} archivo(s) no validos: ${failed.slice(0, 2).join(", ")}${failed.length > 2 ? "..." : ""}`
         );
+      }
     },
-    [addImagesFromFiles],
+    [addImagesFromFiles]
   );
 
-  const onDrop = (e) => {
+  // Soporte nativo para Ctrl + V (Portapapeles)
+  useEffect(() => {
+    const handlePaste = (e) => {
+      const activeEl = document.activeElement;
+      if (
+        activeEl?.tagName === "INPUT" ||
+        activeEl?.tagName === "TEXTAREA" ||
+        activeEl?.isContentEditable
+      ) {
+        return;
+      }
+
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      const files = [];
+      for (const item of items) {
+        if (item.type.startsWith("image/")) {
+          const file = item.getAsFile();
+          if (file) {
+            const namedFile = new File(
+              [file],
+              file.name || `clip-${Date.now()}.png`,
+              { type: file.type }
+            );
+            files.push(namedFile);
+          }
+        }
+      }
+
+      if (files.length > 0) {
+        e.preventDefault();
+        processFiles(files);
+      }
+    };
+
+    window.addEventListener("paste", handlePaste);
+    return () => window.removeEventListener("paste", handlePaste);
+  }, [processFiles]);
+
+  const handleDrop = (e) => {
     e.preventDefault();
     setDragOver(false);
-    onFilesPicked(e.dataTransfer.files);
+    processFiles(e.dataTransfer.files);
+  };
+
+  const handlePlaceAll = () => {
+    if (!images?.length) return;
+    images.forEach((img) => placeImage(img.id));
+    toast.success(`${images.length} imágenes agregadas al lienzo`);
   };
 
   return (
     <aside
       data-testid="left-sidebar"
-      className="w-72 bg-white border-r border-slate-200 flex flex-col z-40 shrink-0"
+      className="w-72 bg-white border-r border-slate-200 flex flex-col z-40 shrink-0 select-none"
     >
       <div className="px-4 pt-4 pb-3">
         <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
@@ -41,6 +92,7 @@ export default function LeftSidebar() {
         </p>
       </div>
 
+      {/* ZONA DE CARGA (DROPZONE) */}
       <div className="px-4 pb-3">
         <div
           data-testid="upload-dropzone"
@@ -50,7 +102,7 @@ export default function LeftSidebar() {
             setDragOver(true);
           }}
           onDragLeave={() => setDragOver(false)}
-          onDrop={onDrop}
+          onDrop={handleDrop}
           className={`border-2 border-dashed rounded-xl bg-slate-50 hover:bg-slate-100 transition-all flex flex-col items-center justify-center p-5 text-center cursor-pointer ${
             dragOver
               ? "border-blue-500 bg-blue-50"
@@ -77,28 +129,50 @@ export default function LeftSidebar() {
             accept="image/*"
             multiple
             className="hidden"
-            onChange={(e) => onFilesPicked(e.target.files)}
+            onChange={(e) => {
+              processFiles(e.target.files);
+              e.target.value = ""; // Fix bug de re-subida del mismo archivo
+            }}
           />
         </div>
       </div>
 
-      <div className="px-4 pb-2 flex items-center justify-between">
-        <p className="text-xs font-medium text-slate-600">
+      {/* CONTROLES INTERMEDIOS */}
+      <div className="px-4 pb-2 flex items-center justify-between gap-1">
+        <p className="text-xs font-medium text-slate-600 truncate">
           {images.length === 0
             ? "Aún sin imágenes"
             : `${images.length} cargada${images.length === 1 ? "" : "s"}`}
         </p>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => inputRef.current?.click()}
-          className="h-7 px-2 text-xs"
-          data-testid="add-more-button"
-        >
-          <Plus className="h-3.5 w-3.5 mr-1" /> Agregar
-        </Button>
+
+        <div className="flex items-center gap-1">
+          {images.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handlePlaceAll}
+              className="h-7 px-2 text-[11px] border-blue-200 text-blue-900 hover:bg-blue-50"
+              data-testid="add-all-button"
+              title="Agregar todas las imágenes al lienzo"
+            >
+              <LayoutGrid className="h-3 w-3 mr-1" />
+              Todas
+            </Button>
+          )}
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => inputRef.current?.click()}
+            className="h-7 px-2 text-xs"
+            data-testid="add-more-button"
+          >
+            <Plus className="h-3.5 w-3.5 mr-1" /> Agregar
+          </Button>
+        </div>
       </div>
 
+      {/* GALERÍA DE MINIATURAS */}
       <ScrollArea className="flex-1 scrollbar-clean">
         <div className="px-4 pb-4 grid grid-cols-2 gap-2">
           {images.length === 0 && (
@@ -128,8 +202,7 @@ export default function LeftSidebar() {
                   src={img.thumb || img.src}
                   alt={img.name}
                   loading="lazy"
-                  className="w-full h-full"
-                  style={{ objectFit: "contain", display: "block" }}
+                  className="w-full h-full object-contain block"
                   draggable={false}
                   onError={(e) => {
                     e.currentTarget.style.opacity = "0.2";

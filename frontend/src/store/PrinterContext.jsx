@@ -1,20 +1,26 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { uid, DEFAULT_MARGIN_MM, clamp, sheetDimsMm } from "../lib/sheet";
+import { uid, DEFAULT_MARGIN_MM } from "../lib/sheet";
 import { buildLayout } from "../lib/layouts";
 import { processIneImage } from "../lib/ineProcessor";
 import { makeThumbnail, compressForCanvas } from "../lib/imageUtils";
+import { saveProjectLocal, loadProjectLocal, clearProjectLocal } from "../lib/db";
 
 const PrinterContext = createContext(null);
 
 const HISTORY_LIMIT = 50;
 
+const DEFAULT_PAPER = {
+  name: "Carta",
+  size: "letter",
+  orientation: "portrait",
+  widthMm: 215.9,
+  heightMm: 279.4,
+};
+
 export function PrinterProvider({ children }) {
-  const [images, setImages] = useState([]); // {id, src, name, w, h}
-  const [placements, setPlacements] = useState([]); // see layouts.js
-  const [paper, setPaper] = useState({
-    size: "letter",
-    orientation: "portrait",
-  });
+  const [images, setImages] = useState([]);
+  const [placements, setPlacements] = useState([]);
+  const [paper, setPaper] = useState(DEFAULT_PAPER);
   const [marginMm, setMarginMm] = useState(DEFAULT_MARGIN_MM);
   const [guillotine, setGuillotine] = useState(false);
   const [snapToGrid, setSnapToGrid] = useState(true);
@@ -23,18 +29,57 @@ export function PrinterProvider({ children }) {
   const [exportGuillotine, setExportGuillotine] = useState(false);
   const [ineMode, setIneMode] = useState(false);
 
-  // History stack para undo/redo. Guarda snapshots de {images, placements}.
   const [history, setHistory] = useState({ past: [], future: [] });
   const imagesRef = useRef(images);
   const placementsRef = useRef(placements);
+
   useEffect(() => {
     imagesRef.current = images;
   }, [images]);
+
   useEffect(() => {
     placementsRef.current = placements;
   }, [placements]);
 
-  // Toma un snapshot ANTES de un cambio destructivo
+  // ==========================================
+  // CONEXIÓN CON BASE DE DATOS LOCAL (IndexedDB)
+  // ==========================================
+  const isLoadedRef = useRef(false);
+
+  useEffect(() => {
+    async function loadDB() {
+      try {
+        const data = await loadProjectLocal();
+        if (data && !isLoadedRef.current) {
+          if (data.images && Array.isArray(data.images)) {
+            setImages(data.images);
+          }
+          if (data.placements && Array.isArray(data.placements)) {
+            setPlacements(data.placements);
+          }
+          if (data.paper && typeof data.paper === "object") {
+            setPaper((prev) => ({ ...prev, ...data.paper }));
+          }
+        }
+      } catch (err) {
+        console.error("Error al cargar IndexedDB:", err);
+      } finally {
+        isLoadedRef.current = true;
+      }
+    }
+    loadDB();
+  }, []);
+
+  useEffect(() => {
+    if (!isLoadedRef.current) return;
+
+    const timer = setTimeout(() => {
+      saveProjectLocal(images, placements);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [images, placements]);
+
   const commit = useCallback(() => {
     setHistory((h) => ({
       past: [
@@ -87,16 +132,29 @@ export function PrinterProvider({ children }) {
     return new Promise((resolve) => {
       const img = new Image();
       img.onload = async () => {
-        // Comprimir imágenes muy grandes (>2000px de lado) para no saturar memoria/render
-        const compressed = await compressForCanvas(src, 2000, 0.92);
-        const finalSrc = compressed.src;
-        const w = compressed.w || img.naturalWidth;
-        const h = compressed.h || img.naturalHeight;
-        const thumb = await makeThumbnail(finalSrc, 240);
+        let finalSrc = src;
+        let w = img.naturalWidth;
+        let h = img.naturalHeight;
+        let thumb = src;
+
+        try {
+          if (typeof compressForCanvas === "function") {
+            const compressed = await compressForCanvas(src, 2000, 0.92);
+            finalSrc = compressed.src || src;
+            w = compressed.w || img.naturalWidth;
+            h = compressed.h || img.naturalHeight;
+          }
+          if (typeof makeThumbnail === "function") {
+            thumb = await makeThumbnail(finalSrc, 240);
+          }
+        } catch (e) {
+          console.warn("Error en compresión/miniatura:", e);
+        }
+
         const item = {
           id: uid("img"),
           src: finalSrc,
-          thumb,
+          thumb: thumb || finalSrc,
           name,
           w,
           h,
@@ -114,7 +172,7 @@ export function PrinterProvider({ children }) {
       const added = [];
       const failed = [];
       for (const file of files) {
-        if (!file.type.startsWith("image/")) {
+        if (!file.type?.startsWith("image/")) {
           failed.push(file.name);
           continue;
         }
@@ -134,30 +192,35 @@ export function PrinterProvider({ children }) {
       }
       return { added, failed };
     },
-    [addImageFromSrc],
+    [addImageFromSrc]
   );
 
-  // Reemplaza el src de una imagen (manteniendo id), p.ej. después de procesar INE
   const replaceImageSrc = useCallback((imageId, src) => {
     return new Promise((resolve) => {
       const im = new Image();
       im.onload = async () => {
-        const thumb = await makeThumbnail(src, 240);
+        let thumb = src;
+        try {
+          if (typeof makeThumbnail === "function") {
+            thumb = await makeThumbnail(src, 240);
+          }
+        } catch (e) {
+          console.warn("Error generando miniatura:", e);
+        }
         setImages((prev) =>
           prev.map((it) =>
             it.id === imageId
               ? { ...it, src, thumb, w: im.naturalWidth, h: im.naturalHeight }
-              : it,
-          ),
+              : it
+          )
         );
-        resolve(true);
+        setTimeout(() => resolve(true), 0);
       };
       im.onerror = () => resolve(false);
       im.src = src;
     });
   }, []);
 
-  // Procesa una imagen ya cargada como INE: detecta bordes + filtro escáner
   const processImageAsIne = useCallback(
     async (imageId, options = {}) => {
       const img = images.find((it) => it.id === imageId);
@@ -170,7 +233,7 @@ export function PrinterProvider({ children }) {
       await replaceImageSrc(imageId, result.src);
       return result;
     },
-    [images, replaceImageSrc],
+    [images, replaceImageSrc]
   );
 
   const removeImage = useCallback(
@@ -179,13 +242,12 @@ export function PrinterProvider({ children }) {
       setImages((prev) => prev.filter((i) => i.id !== imageId));
       setPlacements((prev) => prev.filter((p) => p.imageId !== imageId));
     },
-    [commit],
+    [commit]
   );
 
   const placeImage = useCallback(
     (imageId, partial = {}) => {
       commit();
-      // CRÍTICO: el id debe ser siempre fresh; descartamos cualquier id que venga en partial.
       const { id: _ignoredId, ...rest } = partial;
       const p = {
         pageIndex: 0,
@@ -198,6 +260,11 @@ export function PrinterProvider({ children }) {
         yPct: 10,
         wPct: 30,
         hPct: 30,
+        xMm: 10,
+        yMm: 10,
+        widthMm: 50,
+        heightMm: 50,
+        rotation: 0,
         ...rest,
         id: uid("p"),
         imageId,
@@ -206,12 +273,12 @@ export function PrinterProvider({ children }) {
       setSelectedId(p.id);
       return p;
     },
-    [commit],
+    [commit]
   );
 
   const updatePlacement = useCallback((id, patch) => {
     setPlacements((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+      prev.map((p) => (p.id === id ? { ...p, ...patch } : p))
     );
   }, []);
 
@@ -221,14 +288,106 @@ export function PrinterProvider({ children }) {
       setPlacements((prev) => prev.filter((p) => p.id !== id));
       setSelectedId((cur) => (cur === id ? null : cur));
     },
-    [commit],
+    [commit]
+  );
+
+  const duplicatePlacement = useCallback(
+    (id, patch = {}) => {
+      commit();
+      const p = placements.find((item) => item.id === id);
+      if (!p) return null;
+      const newPlacement = {
+        ...p,
+        id: uid("p"),
+        xMm: (p.xMm || 0) + 5,
+        yMm: (p.yMm || 0) + 5,
+        ...patch,
+      };
+      setPlacements((prev) => [...prev, newPlacement]);
+      setSelectedId(newPlacement.id);
+      return newPlacement;
+    },
+    [placements, commit]
+  );
+
+  const fitPlacementToSheet = useCallback(
+    (id) => {
+      commit();
+      const p = paper || DEFAULT_PAPER;
+      setPlacements((prev) =>
+        prev.map((item) => {
+          if (item.id !== id) return item;
+          return {
+            ...item,
+            xMm: 0,
+            yMm: 0,
+            widthMm: p.widthMm || 215.9,
+            heightMm: p.heightMm || 279.4,
+            rotation: 0,
+          };
+        })
+      );
+    },
+    [paper, commit]
+  );
+
+  const autoArrange = useCallback(() => {
+    if (placements.length === 0) return;
+    commit();
+    const pPaper = paper || DEFAULT_PAPER;
+    const margin = marginMm || 10;
+    let currentX = margin;
+    let currentY = margin;
+    let maxRowHeight = 0;
+
+    setPlacements((prev) =>
+      prev.map((item) => {
+        const w = item.widthMm || 50;
+        const h = item.heightMm || 50;
+
+        if (currentX + w > pPaper.widthMm - margin) {
+          currentX = margin;
+          currentY += maxRowHeight + 5;
+          maxRowHeight = 0;
+        }
+
+        const nextPlacement = {
+          ...item,
+          xMm: currentX,
+          yMm: currentY,
+        };
+
+        currentX += w + 5;
+        if (h > maxRowHeight) maxRowHeight = h;
+
+        return nextPlacement;
+      })
+    );
+  }, [placements, paper, marginMm, commit]);
+
+  const applyInfantilFormat = useCallback(
+    (placementId) => {
+      commit();
+      setPlacements((prev) =>
+        prev.map((p) => {
+          if (p.id !== placementId) return p;
+          return {
+            ...p,
+            fit: "cover",
+            zoom: 1.25,
+            offsetXPct: 0,
+            offsetYPct: -12,
+            widthMm: 25,
+            heightMm: 30,
+          };
+        })
+      );
+    },
+    [commit]
   );
 
   const applyLayout = useCallback(
     (preset) => {
-      // Si hay placements en el lienzo, los acomodamos respetando cantidad
-      // (incluyendo copias duplicadas de la misma imagen).
-      // Si no hay placements, usamos todas las imágenes cargadas.
       const sourceImages =
         placements.length > 0
           ? placements
@@ -246,7 +405,7 @@ export function PrinterProvider({ children }) {
       setPlacements(next);
       setSelectedId(null);
     },
-    [images, placements, paper, marginMm, commit],
+    [images, placements, paper, marginMm, commit]
   );
 
   const clearAll = useCallback(() => {
@@ -255,6 +414,9 @@ export function PrinterProvider({ children }) {
     setPlacements([]);
     setSelectedId(null);
     setInternalClipboard(null);
+    if (typeof clearProjectLocal === "function") {
+      clearProjectLocal();
+    }
   }, [commit]);
 
   const clearCanvas = useCallback(() => {
@@ -270,11 +432,11 @@ export function PrinterProvider({ children }) {
         prev.map((p) =>
           p.id === id
             ? { ...p, fit: "contain", offsetXPct: 0, offsetYPct: 0, zoom: 1 }
-            : p,
-        ),
+            : p
+        )
       );
     },
-    [commit],
+    [commit]
   );
 
   const copySelected = useCallback(() => {
@@ -283,41 +445,22 @@ export function PrinterProvider({ children }) {
     if (p) setInternalClipboard({ ...p });
   }, [selectedId, placements]);
 
-  // Duplicar la imagen seleccionada (copia + paste en un solo paso)
   const duplicateSelected = useCallback(() => {
     if (!selectedId) return null;
     const p = placements.find((x) => x.id === selectedId);
     if (!p) return null;
-    // Desplazar lo suficiente para que se vea claramente
-    const offX = Math.min(p.wPct * 0.5, 8);
-    const offY = Math.min(p.hPct * 0.5, 8);
-    const nx = clamp(p.xPct + offX, 0, 100 - p.wPct);
-    const ny = clamp(p.yPct + offY, 0, 100 - p.hPct);
-    const created = placeImage(p.imageId, {
-      ...p,
-      xPct: nx,
-      yPct: ny,
-    });
-    return created;
-  }, [selectedId, placements, placeImage]);
+    return duplicatePlacement(selectedId);
+  }, [selectedId, placements, duplicatePlacement]);
 
   const pasteInternal = useCallback(() => {
     if (!internalClipboard) return null;
-    const nx = clamp(internalClipboard.xPct + 4, 0, 95);
-    const ny = clamp(internalClipboard.yPct + 4, 0, 95);
-    return placeImage(internalClipboard.imageId, {
-      ...internalClipboard,
-      xPct: nx,
-      yPct: ny,
-    });
-  }, [internalClipboard, placeImage]);
+    return duplicatePlacement(internalClipboard.id);
+  }, [internalClipboard, duplicatePlacement]);
 
-  // Drop directo desde el SO al lienzo: carga la imagen Y crea su placement
-  // en la posición indicada (xPct/yPct relativos a la hoja).
   const dropImagesAt = useCallback(
     async (files, dropXPct, dropYPct, opts = {}) => {
       const arr = Array.from(files || []).filter((f) =>
-        f.type?.startsWith("image/"),
+        f.type?.startsWith("image/")
       );
       if (arr.length === 0) return [];
       const placed = [];
@@ -340,19 +483,13 @@ export function PrinterProvider({ children }) {
           item = { ...item, w: result.w, h: result.h };
         }
         const aspect = (item.w || 1) / (item.h || 1);
-        const wPct = 30;
-        const { widthMm, heightMm } = sheetDimsMm(paper.size, paper.orientation);
-        const wMm = (wPct / 100) * widthMm;
+        const wMm = 50;
         const hMm = wMm / aspect;
-        const hPctRaw = (hMm / heightMm) * 100;
-        const finalH = Math.min(80, Math.max(5, hPctRaw));
-        const xPct = clamp(dropXPct - wPct / 2 + i * 2, 0, 100 - wPct);
-        const yPct = clamp(dropYPct - finalH / 2 + i * 2, 0, 100 - finalH);
         const p = placeImage(item.id, {
-          xPct,
-          yPct,
-          wPct,
-          hPct: finalH,
+          xMm: 10 + i * 5,
+          yMm: 10 + i * 5,
+          widthMm: wMm,
+          heightMm: hMm,
           pageIndex: targetPage,
         });
         placed.push(p);
@@ -360,17 +497,9 @@ export function PrinterProvider({ children }) {
       }
       return placed;
     },
-    [
-      addImageFromSrc,
-      placeImage,
-      paper,
-      ineMode,
-      replaceImageSrc,
-    ],
+    [addImageFromSrc, placeImage, ineMode, replaceImageSrc]
   );
 
-  // Aplica el layout INE: distribuye TODAS las imágenes en pares (frente/reverso) por hoja.
-  // Si solo hay 1 imagen, la duplica como frente y reverso.
   const applyIneLayout = useCallback(() => {
     if (images.length === 0) return;
     commit();
@@ -388,20 +517,20 @@ export function PrinterProvider({ children }) {
 
   const value = useMemo(
     () => ({
-      // state
       images,
       placements,
-      paper,
+      paper: paper || DEFAULT_PAPER,
       marginMm,
       guillotine,
       snapToGrid,
       selectedId,
+      selectedPlacementId: selectedId,
+      setSelectedPlacementId: setSelectedId,
       internalClipboard,
       exportGuillotine,
       ineMode,
       canUndo,
       canRedo,
-      // setters
       setPaper,
       setMarginMm,
       setGuillotine,
@@ -409,14 +538,17 @@ export function PrinterProvider({ children }) {
       setSelectedId,
       setExportGuillotine,
       setIneMode,
-      // actions
       addImagesFromFiles,
       addImageFromSrc,
       removeImage,
       placeImage,
       updatePlacement,
       removePlacement,
+      duplicatePlacement,
+      fitPlacementToSheet,
+      autoArrange,
       applyLayout,
+      applyInfantilFormat,
       clearAll,
       clearCanvas,
       resetPlacement,
@@ -450,7 +582,11 @@ export function PrinterProvider({ children }) {
       placeImage,
       updatePlacement,
       removePlacement,
+      duplicatePlacement,
+      fitPlacementToSheet,
+      autoArrange,
       applyLayout,
+      applyInfantilFormat,
       clearAll,
       clearCanvas,
       resetPlacement,
@@ -464,7 +600,7 @@ export function PrinterProvider({ children }) {
       undo,
       redo,
       commit,
-    ],
+    ]
   );
 
   return (

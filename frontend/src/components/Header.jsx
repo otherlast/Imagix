@@ -39,6 +39,8 @@ export default function Header({ sheetRef }) {
     setSnapToGrid,
     clearAll,
     placements,
+    images,      // <-- EXTRAÍDO PARA PASAR A EXPORTACIÓN
+    marginMm,    // <-- EXTRAÍDO PARA PASAR A EXPORTACIÓN
     paper,
     exportGuillotine,
     setExportGuillotine,
@@ -53,32 +55,39 @@ export default function Header({ sheetRef }) {
 
   const doExport = async (type) => {
     if (exporting.current) return;
-    if (!sheetRef?.current) return;
-    const nodes = sheetRef.current.getSheetNodes?.() || [];
-    if (nodes.length === 0) {
-      toast.error("No hay hojas para exportar");
+    
+    // Verificación de seguridad básica sobre los placements del contexto
+    if (!placements || placements.length === 0) {
+      toast.error("No hay elementos en el lienzo para exportar");
       return;
     }
+
     exporting.current = true;
     const restoreGuillotine = guillotine;
+    
     try {
       if (exportGuillotine !== guillotine) setGuillotine(exportGuillotine);
       await new Promise((r) => setTimeout(r, 80));
-      const ts = new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-");
+
+      // Construcción del objeto unificado que esperan exportToPDF / exportToImage
+      const exportParams = {
+        paper,
+        marginMm,
+        guillotine: exportGuillotine ?? guillotine,
+        placements,
+        images,
+      };
+
       if (type === "pdf") {
-        await exportToPDF(nodes, paper, `papeleria-${ts}.pdf`);
-        toast.success(
-          nodes.length > 1
-            ? `PDF de ${nodes.length} hojas exportado`
-            : "PDF exportado",
-        );
+        await exportToPDF(exportParams);
+        toast.success("PDF exportado con éxito");
       } else {
-        await exportToImage(nodes, paper, type, `papeleria-${ts}`);
-        toast.success(
-          nodes.length > 1
-            ? `${nodes.length} ${type.toUpperCase()} exportados`
-            : `${type.toUpperCase()} exportado`,
-        );
+        await exportToImage({
+          ...exportParams,
+          pageIndex: 0,
+          format: type, // 'png' o 'jpg'
+        });
+        toast.success(`${type.toUpperCase()} exportado con éxito`);
       }
     } catch (e) {
       console.error(e);
